@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>MyMusic — Streaming Player Clone</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+/* Animations */
+@keyframes fadeIn { from {opacity:0; transform:translateY(20px);} to {opacity:1; transform:translateY(0);} }
+@keyframes slideUp { from {opacity:0; transform:translateY(40px);} to {opacity:1; transform:translateY(0);} }
+.animate-fadeIn { animation: fadeIn 0.6s ease forwards; }
+.animate-slideUp { animation: slideUp 0.5s ease forwards; }
+/* Custom style for volume slider track color */
+#volumeSlider::-webkit-slider-runnable-track {
+    background: #4b5563; /* gray-700 */
+}
+#volumeSlider::-moz-range-track {
+    background: #4b5563; /* gray-700 */
+}
+</style>
+</head>
+<body class="bg-gradient-to-br from-gray-900 via-gray-800 to-black text-gray-100 font-sans min-h-screen">
+
+<div id="auth-screen" class="absolute inset-0 flex items-center justify-center w-full max-w-md mx-auto h-screen">
+  <div class="bg-gray-800 p-8 rounded-2xl shadow-2xl text-center animate-fadeIn w-full">
+    <h1 class="text-3xl font-bold mb-8">Welcome to MyMusic</h1>
+    <div class="flex justify-center gap-4">
+      <button id="loginBtn" class="px-6 py-2 rounded-full bg-green-500 text-black font-bold hover:scale-105 transition-transform">Login</button>
+      <button id="signupBtn" class="px-6 py-2 rounded-full bg-gray-700 hover:bg-gray-600 transition">Sign Up</button>
+    </div>
+    <form id="loginForm" class="hidden mt-6 animate-slideUp">
+      <input type="email" placeholder="Email" class="w-full p-2 mb-3 rounded bg-gray-700 text-white focus:outline-none" required />
+      <input type="password" placeholder="Password" class="w-full p-2 mb-4 rounded bg-gray-700 text-white focus:outline-none" required />
+      <button type="submit" class="w-full py-2 bg-green-500 text-black font-bold rounded hover:scale-105 transition-transform">Login</button>
+    </form>
+    <form id="signupForm" class="hidden mt-6 animate-slideUp">
+      <input type="text" placeholder="Username" class="w-full p-2 mb-3 rounded bg-gray-700 text-white focus:outline-none" required />
+      <input type="email" placeholder="Email" class="w-full p-2 mb-3 rounded bg-gray-700 text-white focus:outline-none" required />
+      <input type="password" placeholder="Password" class="w-full p-2 mb-4 rounded bg-gray-700 text-white focus:outline-none" required />
+      <button type="submit" class="w-full py-2 bg-green-500 text-black font-bold rounded hover:scale-105 transition-transform">Sign Up</button>
+    </form>
+  </div>
+</div>
+
+<div id="app-wrapper" class="hidden flex flex-col min-h-screen w-full"></div>
+
+<script>
+// ---------------- AUTH ----------------
+const loginBtn = document.getElementById("loginBtn");
+const signupBtn = document.getElementById("signupBtn");
+const loginForm = document.getElementById("loginForm");
+const signupForm = document.getElementById("signupForm");
+const authScreen = document.getElementById("auth-screen");
+const appWrapper = document.getElementById("app-wrapper");
+
+loginBtn.addEventListener("click", () => { signupForm.classList.add("hidden"); loginForm.classList.toggle("hidden"); });
+signupBtn.addEventListener("click", () => { loginForm.classList.add("hidden"); signupForm.classList.toggle("hidden"); });
+
+loginForm.addEventListener("submit", e => { e.preventDefault(); startApp(); });
+signupForm.addEventListener("submit", e => { e.preventDefault(); startApp(); });
+
+function startApp() {
+  authScreen.classList.add("hidden");
+  appWrapper.classList.remove("hidden");
+  loadSpotifyApp();
+}
+
+// ---------------- SPOTIFY APP ----------------
+function loadSpotifyApp() {
+  // Inject all app content into the wrapper
+  appWrapper.innerHTML = `
+<div class="flex flex-1 overflow-hidden">
+  <aside class="w-64 p-6 bg-transparent border-r border-gray-800 hidden md:block flex-shrink-0">
+    <h1 class="text-2xl font-bold mb-6">MyMusic</h1>
+    <nav class="flex flex-col gap-3">
+      <button class="nav-btn bg-gray-700 text-left px-3 py-2 rounded" data-screen="home">Home</button>
+      <button class="nav-btn text-left px-3 py-2 rounded hover:bg-gray-700" data-screen="browse">Browse</button>
+      <button class="nav-btn text-left px-3 py-2 rounded hover:bg-gray-700" data-screen="library">Your Library</button>
+      <button class="nav-btn text-left px-3 py-2 rounded hover:bg-gray-700" data-screen="now">Now Playing</button>
+    </nav>
+    <div class="mt-8 pt-4 border-t border-gray-800">
+        <button id="logoutBtn" class="w-full text-left px-3 py-2 rounded text-red-400 hover:bg-gray-700 transition">Logout</button>
+    </div>
+  </aside>
+
+  <main class="flex-1 overflow-y-auto">
+    <header class="sticky top-0 z-10 bg-gray-900/90 backdrop-blur-sm p-6 flex justify-between items-center border-b border-gray-800">
+        <div class="relative w-1/3 min-w-40">
+            <input type="text" id="searchInput" placeholder="Search for anything..." class="w-full p-2 pl-10 rounded-full bg-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500" />
+            <svg class="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+        </div>
+        <div class="flex items-center gap-4">
+            <span class="text-xs font-semibold text-green-500 border border-green-500 px-2 py-0.5 rounded-full">PREMIUM</span>
+            <button class="flex items-center gap-2 p-1.5 bg-gray-700 rounded-full hover:bg-gray-600 transition">
+                <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=50&q=80" alt="User" class="w-8 h-8 rounded-full object-cover" />
+                <span class="font-medium text-sm pr-2 hidden sm:inline">My User</span>
+            </button>
+        </div>
+    </header>
+    
+    <div class="p-6">
+        <section id="home" class="screen">
+            <h2 class="text-3xl font-bold mb-6">Good Evening</h2>
+            <h3 class="text-xl font-semibold mb-4">Popular Right Now</h3>
+            <div id="trackGrid" class="grid sm:grid-cols-2 md:grid-cols-3 gap-4"></div>
+        </section>
+
+        <section id="browse" class="screen hidden">
+            <h2 class="text-3xl font-bold mb-6">Browse & Discover</h2>
+            <h3 class="text-xl font-semibold mb-4">New Releases</h3>
+            <div class="grid sm:grid-cols-2 md:grid-cols-4 gap-4">
+                <div class="bg-indigo-600 p-4 rounded-lg font-bold text-center">Charts</div>
+                <div class="bg-red-600 p-4 rounded-lg font-bold text-center">Pop</div>
+                <div class="bg-green-600 p-4 rounded-lg font-bold text-center">Hip-Hop</div>
+                <div class="bg-yellow-600 p-4 rounded-lg font-bold text-center">Workout</div>
+            </div>
+            <h3 class="text-xl font-semibold mb-4 mt-8">Top Charts</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="flex items-center bg-gray-800 p-3 rounded-lg"><span class="text-green-500 font-bold w-6">1</span> Global Top 50</div>
+                <div class="flex items-center bg-gray-800 p-3 rounded-lg"><span class="text-green-500 font-bold w-6">2</span> Viral Hits</div>
+            </div>
+        </section>
+
+        <section id="library" class="screen hidden">
+            <h2 class="text-3xl font-bold mb-6">Your Library</h2>
+            <div class="flex gap-3 mb-6">
+                <span class="px-4 py-1 rounded-full bg-green-500 text-black font-semibold">Playlists</span>
+                <span class="px-4 py-1 rounded-full bg-gray-700 hover:bg-gray-600 cursor-pointer">Albums</span>
+                <span class="px-4 py-1 rounded-full bg-gray-700 hover:bg-gray-600 cursor-pointer">Liked Songs</span>
+            </div>
+            <div id="playlistList" class="space-y-3"></div>
+            <div class="mt-8 p-4 bg-gray-800 rounded-lg">
+                <h3 class="font-semibold">Recently Played</h3>
+                <p class="text-xs opacity-70">Daylight by Aurora</p>
+            </div>
+        </section>
+
+                <section id="now" class="screen hidden">
+          <div class="flex flex-col sm:flex-row gap-6">
+            <div class="sm:w-1/3 bg-gray-800 rounded p-4">
+              <img id="cover" class="w-full h-64 object-cover rounded mb-4 shadow-xl" />
+              <div class="font-bold text-lg" id="title"></div>
+              <div class="opacity-70" id="artist"></div>
+              <div class="mt-6">
+                <div class="h-2 bg-gray-700 rounded cursor-pointer" id="progressBar">
+                  <div id="progressFill" class="h-2 bg-green-500 rounded" style="width: 0%"></div>
+                </div>
+                <div class="flex justify-between text-xs opacity-60 mt-2">
+                  <span id="currentTime">0:00</span>
+                    <span id="totalTime">0:00</span>
+                </div>
+              </div>
+              <div class="mt-6 flex items-center gap-4 justify-center">
+                <button id="shuffleBtn" class="p-2 rounded hover:bg-gray-700 opacity-50">🔀</button>
+                <button id="prevBtn" class="p-2 rounded hover:bg-gray-700">⟸</button>
+                <button id="playPauseBtn" class="px-4 py-2 rounded bg-green-500 text-black font-bold">Play</button>
+                <button id="nextBtn" class="p-2 rounded hover:bg-gray-700">⟹</button>
+                <button id="repeatBtn" class="p-2 rounded hover:bg-gray-700 opacity-50">🔁</button>
+              </div>
+            </div>
+          </div>
+        </section>
+    </div>
+  </main>
+</div>
+
+<div class="bg-gray-900 border-t border-gray-800 py-3 px-6 flex items-center justify-between flex-shrink-0">
+  <div class="flex items-center gap-3 w-1/3">
+    <img id="miniCover" class="w-12 h-12 object-cover rounded" />
+    <div>
+      <div id="miniTitle" class="font-medium"></div>
+      <div id="miniArtist" class="text-xs opacity-60"></div>
+    </div>
+  </div>
+  <div class="flex items-center gap-2">
+    <button id="miniPrev" class="p-2 rounded hover:bg-gray-800">⟸</button>
+    <button id="miniPlayPause" class="px-3 py-1 rounded bg-green-500 text-black font-bold">Play</button>
+    <button id="miniNext" class="p-2 rounded hover:bg-gray-800">⟹</button>
+  </div>
+    <div class="flex items-center gap-2 w-1/3 justify-end">
+        <button id="miniShuffle" class="p-2 rounded hover:bg-gray-800 opacity-50">🔀</button>
+        <button id="miniRepeat" class="p-2 rounded hover:bg-gray-800 opacity-50">🔁</button>
+        <svg class="h-5 w-5 opacity-60" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M9.383 3.654A1 1 0 0110 4v12a1 1 0 01-1.383.954L6.46 14.53A1 1 0 006 14H5a2 2 0 01-2-2V8a2 2 0 012-2h1a1 1 0 00.46-.16L8.617 3.654zM16 10a4 4 0 00-6.18-3.32L10 6.5V13.5l-.18.18A4 4 0 0016 10z" clip-rule="evenodd"></path></svg>
+        <input type="range" id="volumeSlider" min="0" max="1" step="0.05" value="1" class="w-24 h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:bg-green-500 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-moz-range-thumb]:bg-green-500 [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:w-3 [&::-moz-range-thumb]:h-3 [&::-moz-range-thumb]:rounded-full" />
+    </div>
+</div>
+<audio id="audio"></audio>
+`;
+
+  initSpotifyApp();
+}
+
+function initSpotifyApp() {
+  const tracks = [
+    { title:"Dreams", artist:"Nuage", duration:215, cover:"https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=800&q=80", src:"https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" },
+    { title:"Daylight", artist:"Aurora", duration:189, cover:"https://images.unsplash.com/photo-1502767089025-6572583495b0?w=800&q=80", src:"https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3" },
+    { title:"Midnight City", artist:"Cityscapes", duration:241, cover:"https://images.unsplash.com/photo-1508921912186-1d1a45ebb3c1?w=800&q=80", src:"https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3" }
+  ];
+
+  const audio = document.getElementById("audio");
+  let currentIndex = 0, isPlaying = false;
+  let isShuffling = false; 
+  let repeatMode = 'none'; // 'none', 'one', 'all' 
+
+  const cover = document.getElementById("cover"), titleEl = document.getElementById("title"), artistEl = document.getElementById("artist");
+  const miniCover = document.getElementById("miniCover"), miniTitle = document.getElementById("miniTitle"), miniArtist = document.getElementById("miniArtist");
+  const progressFill = document.getElementById("progressFill"), currentTimeEl = document.getElementById("currentTime");
+  const playPauseBtn = document.getElementById("playPauseBtn"), miniPlayPause = document.getElementById("miniPlayPause");
+  const volumeSlider = document.getElementById("volumeSlider");
+
+  // Player Control buttons
+  const shuffleBtn = document.getElementById("shuffleBtn"), miniShuffle = document.getElementById("miniShuffle");
+  const repeatBtn = document.getElementById("repeatBtn"), miniRepeat = document.getElementById("miniRepeat");
+
+  // Volume Control setup
+  if (volumeSlider) {
+        audio.volume = volumeSlider.value;
+        volumeSlider.addEventListener("input", (e) => { audio.volume = e.target.value; });
+    }
+
+    // Logout functionality
+    document.getElementById("logoutBtn").addEventListener("click", () => {
+        if(confirm("Are you sure you want to log out?")) {
+            // Pause music, reset state
+            audio.pause();
+            isPlaying = false;
+            appWrapper.classList.add("hidden");
+            authScreen.classList.remove("hidden");
+        }
+    });
+
+  function formatTime(s){ const m=Math.floor(s/60); const sec=Math.floor(s%60).toString().padStart(2,"0"); return `${m}:${sec}`; }
+
+  function loadTrack(i){
+    const t = tracks[i];
+    audio.src=t.src;
+    cover.src=t.cover; titleEl.textContent=t.title; artistEl.textContent=t.artist;
+    miniCover.src=t.cover; miniTitle.textContent=t.title; miniArtist.textContent=t.artist;
+    // Update total time display (which is in the Now Playing screen HTML)
+    const totalTimeEl = document.getElementById("totalTime"); 
+    if(totalTimeEl) totalTimeEl.textContent=formatTime(t.duration);
+    progressFill.style.width="0%";
+    currentTimeEl.textContent="0:00";
+  }
+    
+    // Handle track ending based on shuffle/repeat mode
+    function handleTrackEnd() {
+        if (repeatMode === 'one') {
+            audio.play(); // Repeat the same track
+        } else if (isShuffling) {
+            currentIndex = Math.floor(Math.random() * tracks.length);
+            loadTrack(currentIndex);
+            audio.play().catch(()=>{});
+        } else if (repeatMode === 'all' || currentIndex < tracks.length - 1) {
+            nextTrack();
+        } else {
+            // Stop playing if not repeating and reached the end
+            isPlaying = false;
+            playPauseBtn.textContent = "Play";
+            miniPlayPause.textContent = "Play";
+            loadTrack(0); // Reset to first track
+        }
+    }
+
+  function playPause(){ if(isPlaying){ audio.pause(); isPlaying=false; } else { audio.play().catch(()=>{}); isPlaying=true; } playPauseBtn.textContent=isPlaying?"Pause":"Play"; miniPlayPause.textContent=isPlaying?"Pause":"Play"; }
+  function nextTrack(){ currentIndex=(currentIndex+1)%tracks.length; loadTrack(currentIndex); if(isPlaying) audio.play(); }
+  function prevTrack(){ currentIndex=(currentIndex-1+tracks.length)%tracks.length; loadTrack(currentIndex); if(isPlaying) audio.play(); }
+
+    // Toggle Shuffle Mode
+    function toggleShuffle() {
+        isShuffling = !isShuffling;
+        // Simple way to toggle the look: replace color/opacity class on both elements
+        [shuffleBtn, miniShuffle].forEach(btn => {
+            if (!btn) return;
+            btn.classList.remove('opacity-50', 'text-green-500');
+            btn.classList.add(isShuffling ? 'text-green-500' : 'opacity-50');
+        });
+    }
+
+    // Toggle Repeat Mode
+    function toggleRepeat() {
+        if (repeatMode === 'none') {
+            repeatMode = 'all';
+            [repeatBtn, miniRepeat].forEach(btn => { if(btn) { btn.classList.remove('opacity-50'); btn.classList.add('text-green-500'); btn.textContent = '🔁'; } });
+        } else if (repeatMode === 'all') {
+            repeatMode = 'one';
+            [repeatBtn, miniRepeat].forEach(btn => { if(btn) { btn.textContent = '🔁 1'; } }); // Changed visual indicator to '🔁 1'
+        } else {
+            repeatMode = 'none';
+            [repeatBtn, miniRepeat].forEach(btn => { if(btn) { btn.classList.remove('text-green-500'); btn.classList.add('opacity-50'); btn.textContent = '🔁'; } });
+        }
+    }
+
+  playPauseBtn.onclick=miniPlayPause.onclick=playPause;
+  document.getElementById("nextBtn").onclick=document.getElementById("miniNext").onclick=nextTrack;
+  document.getElementById("prevBtn").onclick=document.getElementById("miniPrev").onclick=prevTrack;
+    
+    // Shuffle/Repeat handlers
+    if(shuffleBtn) shuffleBtn.onclick = toggleShuffle;
+    if(miniShuffle) miniShuffle.onclick = toggleShuffle;
+    if(repeatBtn) repeatBtn.onclick = toggleRepeat;
+    if(miniRepeat) miniRepeat.onclick = toggleRepeat;
+
+  audio.addEventListener("timeupdate",()=>{ const pct=(audio.currentTime/tracks[currentIndex].duration)*100; progressFill.style.width=pct+"%"; currentTimeEl.textContent=formatTime(audio.currentTime); });
+  audio.addEventListener("ended", handleTrackEnd); 
+
+  document.querySelectorAll(".nav-btn").forEach(btn=>btn.addEventListener("click",()=>{
+    const screen=btn.dataset.screen;
+    document.querySelectorAll(".screen").forEach(s=>s.classList.add("hidden"));
+    document.getElementById(screen).classList.remove("hidden");
+    document.querySelectorAll(".nav-btn").forEach(b=>b.classList.remove("bg-gray-700"));
+    btn.classList.add("bg-gray-700");
+  }));
+
+  const trackGrid = document.getElementById("trackGrid"), playlistList=document.getElementById("playlistList");
+  
+  // Create and append 'Daily Mix' section
+  const recentlyPlayedSection = document.createElement("div");
+  recentlyPlayedSection.innerHTML = '<h3 class="text-xl font-semibold mb-4 mt-8">Your Daily Mix</h3><div id="dailyMixGrid" class="grid sm:grid-cols-2 md:grid-cols-3 gap-4"></div>';
+  document.getElementById("home").appendChild(recentlyPlayedSection);
+  const dailyMixGrid = document.getElementById("dailyMixGrid");
+  
+
+  tracks.forEach((t,i)=>{
+    const card=document.createElement("div"); card.className="bg-gray-800 rounded p-3 hover:scale-105 transition-transform cursor-pointer";
+    card.innerHTML=`<img src="${t.cover}" class="w-full h-40 object-cover rounded mb-3" /><div class="font-semibold">${t.title}</div><div class="text-xs opacity-60">${t.artist}</div>`;
+    
+    const playCard = () => { currentIndex=i; loadTrack(i); audio.play().catch(()=>{}); isPlaying=true; playPauseBtn.textContent="Pause"; miniPlayPause.textContent="Pause"; document.querySelectorAll(".screen").forEach(s=>s.classList.add("hidden")); document.getElementById("now").classList.remove("hidden"); 
+        document.querySelectorAll(".nav-btn").forEach(b=>b.classList.remove("bg-gray-700"));
+        document.querySelector('[data-screen="now"]').classList.add("bg-gray-700"); // Highlight Now Playing
+    };
+    
+    card.onclick = playCard;
+    trackGrid.appendChild(card);
+    
+    // Duplicate card for the Daily Mix section
+    const dailyMixCard = card.cloneNode(true);
+    dailyMixCard.onclick = playCard; 
+    dailyMixGrid.appendChild(dailyMixCard);
+    
+    const item=document.createElement("div"); item.className="flex items-center gap-3 bg-gray-800 rounded p-3";
+    item.innerHTML=`<img src="${t.cover}" class="w-16 h-16 object-cover rounded" /><div class="flex-1"><div class="font-semibold">${t.title}</div><div class="text-xs opacity-60">${t.artist}</div></div><button class="px-3 py-1 rounded bg-green-600 text-black font-semibold">Play</button>`;
+    item.querySelector("button").onclick=playCard;
+    playlistList.appendChild(item);
+  });
+
+  loadTrack(0);
+}
+</script>
+</body>
+</html>
